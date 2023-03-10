@@ -1,0 +1,78 @@
+# -*- coding: utf-8 -*- 
+"""
+Project Name: novel
+Author: ARtcgb
+Email:artcgb@ebay.onmicrosoft.com
+Date: 2021/4/24
+"""
+import os
+import requests
+from faker import Faker
+from bs4 import BeautifulSoup
+
+f = Faker()
+headers = {'user-agent': f.user_agent()}
+
+while True:
+    search_url = "https://www.mibaoge.com/search.php?q=" + input("输入要查找的书名：")
+    requests_url = requests.get(search_url, headers=headers)
+    soup_url = BeautifulSoup(requests_url.text, "lxml")
+
+    search_list = soup_url.find_all("a", cpos="title")
+    if search_list:
+        count = 1
+        for soup in search_list:
+            print(count, soup.text.replace("\n", ""))
+            count += 1
+        break
+    else:
+        print("未搜索到相关结果")
+
+choose = int(input("请输入所选查找结果前面的数字：")) - 1
+title = soup_url.find_all("a", cpos="title")[choose].text.replace("\n", "")
+title_url = soup_url.find_all("a", cpos="title")[choose]["href"]
+
+url = "https://www.mibaoge.com" + title_url
+requests_url = requests.get(url, headers=headers)
+soup_url = BeautifulSoup(requests_url.text, "lxml")
+
+menu_list = soup_url.find("div", id="list").find_all("a")
+url_list = []
+chapter_list = []
+for menu in menu_list:
+    url_list.append(menu['href'])
+    chapter_list.append(menu.text)
+
+print("共找到", len(url_list), "个章节")
+
+a = os.path.exists("./小说")
+b = os.path.exists("./小说/" + title)
+if a and b:
+    print("文件夹已存在，PASS")
+elif a:
+    os.mkdir("./小说/" + title)
+    print("文件夹建立成功")
+else:
+    os.mkdir("./小说")
+    os.mkdir("./小说/" + title)
+    print("文件夹建立成功")
+
+url_count = 0
+for url in url_list:
+    a = os.path.exists("./小说/" + title + "/" + chapter_list[url_count] + ".txt")
+    url_count += 1
+    if a:
+        try:
+            print(chapter_list[url_count], "已存在，PASS")
+        except IndexError:
+            print("全部章节验证完毕")
+        continue
+    requests_url = requests.get("https://www.mibaoge.com/" + url, headers=headers)
+    soup = BeautifulSoup(requests_url.text, "lxml")
+    chapter = soup.find("h1").text
+    content = str(soup.find("div", id="content")).replace("<!--go-->", "").replace("<!--over-->", "") \
+        .replace("<br/>", "\n").replace("<div id=\"content\">", "").replace("</div>", "")
+    with open("./小说/" + title + "/" + chapter + ".txt", "w") as f:
+        f.write(content)
+        print(chapter, "写入成功")
+print(title, "写入成功")
